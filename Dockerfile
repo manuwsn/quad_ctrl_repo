@@ -13,5 +13,12 @@ ADD app /app
 RUN apt-get update && apt-get install -y \
     python-catkin-tools \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/grone_ws
+RUN /bin/bash -c 'source /opt/ros/kinetic/setup.sh \
+    && catkin build'
     
+    
+
+
 
