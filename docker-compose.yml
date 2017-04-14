@@ -1,0 +1,32 @@
+version: '2'
+services:
+ master:
+  build: .
+  container_name: master
+  command:
+   - roscore
+ quad:
+  build: .
+  depends_on:
+   - master
+  container_name: quad
+  environment:
+    - "ROS_HOSTNAME=quad"
+    - "ROS_MASTER_URI=http://master:11311"
+  command: bash -c 'source /ros_entrypoint.sh && source devel/setup.bash && rosrun quad_ctrl quad_ctrl_node'
+
+ vrep:
+   build: ../vrep
+   depends_on:
+    - master
+    - quad
+   container_name: vrep
+   environment:
+    - "DISPLAY"
+    - "QT_X11_NO_MITSHM=1"
+    - "ROS_HOSTNAME=vrep"
+    - "ROS_MASTER_URI=http://master:11311"
+   volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ~/Documents/VREP:/VREP
+   command: bash -c '/vrep/vrep.sh'
