@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/JointState.h>
 #include <malloc.h>
 #include <math.h>
 #include <string.h>
@@ -17,7 +18,8 @@ public:
 
 private:
   void scanCallback(const sensor_msgs::LaserScan::ConstPtr& laserScan);
-  void vertScanCallback(const sensor_msgs::LaserScan::ConstPtr& laserScan);
+  // void vertScanCallback(const sensor_msgs::LaserScan::ConstPtr& laserScan);
+  void jointStateCallback(const sensor_msgs::JointState::ConstPtr& jointState);
   void b_update_cache(int x);
   void push(int y, int w);
   stack_type * pop();
@@ -28,12 +30,16 @@ private:
   ros::Publisher cmd_pub_;
   ros::Subscriber laser_sub_;
   ros::Subscriber vert_laser_sub_;
+  ros::Subscriber joint_state_sub;
 
   geometry_msgs::Twist twist;
 
   int time;
   char b[BEAM*RANGES];
   int cache[RANGES];
+
+  float position;
+  
   stack_type * stack;
 
 };
@@ -45,8 +51,10 @@ Quad_Ctrl_Node::Quad_Ctrl_Node():
   cmd_pub_ = nh_.advertise<geometry_msgs::Twist>("/quad_cmd_twist", 1);
   
   laser_sub_ = nh_.subscribe<sensor_msgs::LaserScan>("/vrep/front_scan", 10, &Quad_Ctrl_Node::scanCallback, this);
-  vert_laser_sub_ = nh_.subscribe<sensor_msgs::LaserScan>("/vrep/vert_front_scan", 10, &Quad_Ctrl_Node::vertScanCallback, this);
+  // vert_laser_sub_ = nh_.subscribe<sensor_msgs::LaserScan>("/vrep/vert_front_scan", 10, &Quad_Ctrl_Node::vertScanCallback, this);
 
+  joint_state_sub = nh_.subscribe<sensor_msgs::JointState>("/vrep/joint_state", 10, &Quad_Ctrl_Node::jointStateCallback, this);
+  
   stack = NULL;
 }
 
@@ -66,7 +74,7 @@ int Quad_Ctrl_Node::all_ones(int lx,int ly,int ux,int uy){
 	return 0;
   return 1;
 }
-
+/*
 void Quad_Ctrl_Node::vertScanCallback(const sensor_msgs::LaserScan::ConstPtr& laserScan)
   {
  
@@ -86,6 +94,12 @@ void Quad_Ctrl_Node::vertScanCallback(const sensor_msgs::LaserScan::ConstPtr& la
     
     cmd_pub_.publish(twist);
   }
+*/
+void Quad_Ctrl_Node::jointStateCallback(const sensor_msgs::JointState::ConstPtr& jointState)
+{
+ 
+  position = jointState->position[0];
+}
 
 void Quad_Ctrl_Node::scanCallback(const sensor_msgs::LaserScan::ConstPtr& laserScan)
   {
@@ -192,10 +206,57 @@ void Quad_Ctrl_Node::scanCallback(const sensor_msgs::LaserScan::ConstPtr& laserS
       }
       printf("\n\n");
     }
-    
-    twist.linear.x = x;
-    twist.linear.y = y;
+
     twist.angular.z = ((irect)*3.14)/BEAM - (3.14/2);
+    twist.linear.x = x;
+      
+    if (position >=0 && position < 0.75){  
+      twist.linear.z = 0; 
+    }
+    if (position >=0.75 && position < 1.5){ 
+      twist.angular.z = twist.angular.z*0.5;
+      if (irect < BEAM/2)
+	twist.linear.z = +0.1;
+      else
+	twist.linear.z = -0.1;
+    }
+    if (position >=1.5 && position < 2.25){
+      twist.angular.z = 0;
+      if (irect < BEAM/2)
+	twist.linear.z = +0.2;
+      else
+	twist.linear.z = -0.2;
+    }
+    if (position >=2.25 && position < 3){
+      twist.angular.z = -twist.angular.z;
+     
+    }
+    if (position >=-3 && position < -2.25){
+      twist.angular.z = -twist.angular.z;
+    }
+    if (position >=-2.25 && position < -1.5){
+      twist.angular.z = -twist.angular.z*0.5;
+      if (irect < BEAM/2)
+	twist.linear.z = -0.2;
+      else
+	twist.linear.z = +0.2;
+    }
+    if (position >= -1.5 && position < -0.75){
+      twist.angular.z=0;
+      if (irect < BEAM/2)
+	twist.linear.z = -0.1;
+      else
+	twist.linear.z = +0.1;
+    }
+    if (position >= -0.75 && position < 0){
+    }
+    
+    //twist.linear.y = y;
+    //twist.angular.z = ((irect)*3.14)/BEAM - (3.14/2);
+    if(DEBUG)
+    printf("x : %f, y :  %f, z : %f, xA : %f\n",twist.linear.x, twist.linear.y, twist.linear.z,twist.angular.z);
+    
+    cmd_pub_.publish(twist);
 }
     
 
